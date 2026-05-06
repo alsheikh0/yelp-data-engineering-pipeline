@@ -1,0 +1,209 @@
+# models/gold/schema.yml
+# ─────────────────────────────────────────────────────────────
+# Documents all Gold models and attaches dbt tests.
+# Run with: dbt test --select gold
+# ─────────────────────────────────────────────────────────────
+
+version: 2
+
+models:
+
+  # ── DIMENSIONS ──────────────────────────────────────────────────────────────
+
+  - name: dim_business
+    description: >
+      SCD Type 2 business dimension. One row per (business_id, version).
+      Filter is_current=true for current state. Join on valid_from/valid_to
+      for point-in-time accuracy in fact tables.
+      Enriched with rating_tier, price_tier, popularity_tier, is_full_service.
+    columns:
+      - name: business_key
+        description: Surrogate key — unique per version of each business
+        tests: [unique, not_null]
+      - name: business_id
+        description: Natural key from Yelp source
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+      - name: valid_from
+        tests: [not_null]
+      - name: stars
+        tests: [not_null]
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              values: [open, closed]
+      - name: price_tier
+        tests:
+          - accepted_values:
+              values: [budget, moderate, upscale, fine_dining, unknown]
+      - name: rating_tier
+        tests:
+          - accepted_values:
+              values: [exceptional, great, good, average, below_average]
+      - name: popularity_tier
+        tests:
+          - accepted_values:
+              values: [very_popular, popular, established, growing, new]
+
+  - name: dim_user
+    description: >
+      SCD Type 2 user dimension. Tracks user_tier transitions over time.
+      is_current=true gives latest snapshot per user.
+    columns:
+      - name: user_key
+        tests: [unique, not_null]
+      - name: user_id
+        tests: [not_null]
+      - name: user_tier
+        tests:
+          - not_null
+          - accepted_values:
+              values: [elite, veteran, active, newcomer]
+      - name: tier_rank
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+
+  - name: dim_date
+    description: >
+      Calendar dimension covering Yelp dataset years (2004–2022).
+      366 rows per year + leap year handling.
+    columns:
+      - name: date_key
+        description: Integer surrogate key in YYYYMMDD format
+        tests: [unique, not_null]
+      - name: calendar_date
+        tests: [unique, not_null]
+      - name: is_weekend
+        tests: [not_null]
+
+  # ── FACTS ───────────────────────────────────────────────────────────────────
+
+  - name: fact_reviews
+    description: >
+      Review-grain fact table, ~7M rows. Partitioned by review_year.
+      Uses SCD Type 2 point-in-time joins to dim_business and dim_user
+      so historical reviews see dimension state at review time, not current.
+    columns:
+      - name: review_id
+        tests: [unique, not_null]
+      - name: business_key
+        description: FK to dim_business — points to version active at review_date
+        tests: [not_null]
+      - name: user_key
+        description: FK to dim_user — points to version active at review_date
+        tests: [not_null]
+      - name: review_date
+        tests: [not_null]
+      - name: stars
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+      - name: sentiment_proxy
+        tests:
+          - not_null
+          - accepted_values:
+              values: [positive, neutral, negative]
+      - name: review_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: [detailed_positive, brief_positive, detailed_negative,
+                       brief_negative, neutral]
+      - name: reviewer_segment
+        tests:
+          - not_null
+          - accepted_values:
+              values: [elite_reviewer, veteran_reviewer, standard_reviewer]
+
+  - name: fact_checkins
+    description: >
+      Checkin event-grain fact. One row per individual checkin event.
+      Partitioned by checkin_year. Exploded from Bronze comma-sep timestamps.
+    columns:
+      - name: checkin_id
+        tests: [unique, not_null]
+      - name: business_id
+        tests: [not_null]
+      - name: checkin_at
+        tests: [not_null]
+      - name: time_of_day
+        tests:
+          - not_null
+          - accepted_values:
+              values: [morning, afternoon, evening, night]
+
+  - name: fact_tips
+    description: >
+      Tip event-grain fact. One row per tip left by a user on a business.
+      Partitioned by tip_year. SCD Type 2 point-in-time joins to dims.
+    columns:
+      - name: tip_id
+        tests: [unique, not_null]
+      - name: business_key
+        tests: [not_null]
+      - name: user_key
+        tests: [not_null]
+      - name: tip_date
+        tests: [not_null]
+      - name: tip_engagement_tier
+        tests:
+          - not_null
+          - accepted_values:
+              values: [viral, popular, engaged, no_engagement]
+      - name: tip_length_tier
+        tests:
+          - not_null
+          - accepted_values:
+              values: [very_brief, brief, detailed, very_detailed]
+
+  # ── AGGREGATES ──────────────────────────────────────────────────────────────
+
+  - name: agg_business_monthly
+    description: >
+      Monthly KPIs per business combining review signals and tip signals.
+      Window functions: MoM change, rolling 3M avg stars, city rank,
+      rolling 3M tip count. Primary table for trend dashboards.
+    columns:
+      - name: business_id
+        tests: [not_null]
+      - name: review_year
+        tests: [not_null]
+      - name: review_month
+        tests: [not_null]
+      - name: rating_trend
+        tests:
+          - accepted_values:
+              values: [improving, declining, stable]
+
+  - name: agg_city_category
+    description: >
+      Yearly review KPIs by city × category. YoY volume growth,
+      cumulative totals, category rank within city, growth labels.
+    columns:
+      - name: review_year
+        tests: [not_null]
+      - name: city
+        tests: [not_null]
+      - name: category
+        tests: [not_null]
+      - name: growth_label
+        tests:
+          - accepted_values:
+              values: [fast_growing, growing, stable, declining, fast_declining]
+
+  - name: agg_user_cohort
+    description: >
+      User cohort analysis by member join year.
+      Grain: (cohort_year, review_year, years_since_joining).
+      Includes retention %, reviews per active user, elite conversion.
+    columns:
+      - name: cohort_year
+        tests: [not_null]
+      - name: review_year
+        tests: [not_null]
+      - name: active_users
+        tests: [not_null]

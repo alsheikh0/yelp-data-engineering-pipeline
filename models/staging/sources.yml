@@ -1,0 +1,82 @@
+# models/staging/sources.yml
+version: 2
+
+sources:
+  - name: silver
+    description: >
+      Silver layer Delta tables written by the PySpark notebooks.
+      All tables partitioned for query performance.
+      business and users tables are SCD Type 2 with valid_from/valid_to.
+    schema: silver
+
+    tables:
+      - name: business
+        description: >
+          Cleaned and flattened business records. SCD Type 2 —
+          one row per (business_id, change_hash). Filter is_current=true
+          for current snapshot or join on valid_from/valid_to for point-in-time.
+        columns:
+          - name: business_id
+            tests: [not_null]
+          - name: is_current
+            tests: [not_null]
+          - name: change_hash
+            tests: [not_null]
+
+      - name: reviews
+        description: >
+          Cleaned review records, ~7M rows. Partitioned by review_year/review_month.
+          Raw text dropped — Bronze is the replay source.
+        columns:
+          - name: review_id
+            tests: [unique, not_null]
+          - name: stars
+            tests:
+              - not_null
+              - accepted_values:
+                  values: [1, 2, 3, 4, 5]
+
+      - name: users
+        description: >
+          Cleaned user records. SCD Type 2 — filter is_current=true for current state.
+        columns:
+          - name: user_id
+            tests: [not_null]
+
+      - name: checkins
+        description: >
+          Exploded checkin events — one row per individual checkin timestamp.
+          Partitioned by checkin_year/checkin_month.
+        columns:
+          - name: business_id
+            tests: [not_null]
+          - name: checkin_at
+            tests: [not_null]
+
+      - name: tips
+        description: Cleaned tip records. Partitioned by tip_year/tip_month.
+        columns:
+          - name: business_id
+            tests: [not_null]
+          - name: user_id
+            tests: [not_null]
+
+      - name: business_categories
+        description: >
+          Bridge table — one row per (business_id, category).
+          Exploded from the categories comma-separated string in Bronze.
+        columns:
+          - name: business_id
+            tests: [not_null]
+          - name: category
+            tests: [not_null]
+
+      - name: user_elite_years
+        description: >
+          Bridge table — one row per (user_id, elite_year).
+          Exploded from the elite array in user.json.
+        columns:
+          - name: user_id
+            tests: [not_null]
+          - name: elite_year
+            tests: [not_null]

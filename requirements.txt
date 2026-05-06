@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# requirements.txt — Yelp DE Pipeline
+# Install with: pip install -r requirements.txt
+#
+# For Databricks notebooks: packages marked [databricks] are pre-installed
+# on Databricks Runtime 13.x+ clusters — no manual install needed there.
+# Install the rest on your local machine or CI runner.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── dbt ─────────────────────────────────────────────────────────────────────
+dbt-core>=1.7.0,<2.0.0
+dbt-databricks>=1.7.0,<2.0.0
+
+# ── Airflow ──────────────────────────────────────────────────────────────────
+apache-airflow>=2.8.0,<3.0.0
+apache-airflow-providers-microsoft-azure>=8.0.0
+apache-airflow-providers-databricks>=6.0.0
+
+# ── PySpark (local dev only — Databricks clusters use their own Spark) ───────
+# pyspark==3.5.0        # uncomment for local testing
+
+# ── Delta Lake (local dev only) ───────────────────────────────────────────────
+# delta-spark==3.1.0    # uncomment for local testing
+
+# ── Azure SDK ────────────────────────────────────────────────────────────────
+azure-storage-file-datalake>=12.14.0
+azure-identity>=1.15.0
+
+# ── Data profiling / local validation ────────────────────────────────────────
+pandas>=2.0.0
+pyarrow>=14.0.0
+
+# ── Testing ──────────────────────────────────────────────────────────────────
+pytest>=7.4.0
+pytest-mock>=3.11.0

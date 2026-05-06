@@ -1,0 +1,29 @@
+name: yelp_analytics
+version: '1.0.0'
+config-version: 2
+
+profile: yelp_analytics
+
+model-paths: ["models"]
+test-paths:  ["tests"]
+macro-paths: ["macros"]
+seed-paths:  ["seeds"]
+
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  yelp_analytics:
+    staging:
+      +materialized: view
+      +schema: staging
+    gold:
+      +materialized: table
+      +schema: gold
+      +file_format: delta
+      dimensions:
+        +materialized: table
+      facts:
+        +materialized: table
+      aggregates:
+        +materialized: table

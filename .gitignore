@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.Python
+.env
+.venv
+env/
+venv/
+dist/
+build/
+
+# dbt
+target/
+dbt_packages/
+logs/
+.dbt/
+
+# Databricks
+.databricks/
+*.dbc
+
+# Credentials — NEVER commit these
+profiles.yml
+.env
+secrets.yml
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Data files — store in ADLS, not in git
+*.parquet
+*.json
+*.csv
+*.delta

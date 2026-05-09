@@ -10,6 +10,7 @@ env/
 venv/
 dist/
 build/
+docs/
 
 # dbt
 target/
